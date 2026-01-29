@@ -220,7 +220,6 @@ core <- gene_prevalence |>
   pull(Gene)
 
 
-
 # prevalence -------------------------------------------------------------------
 
 
@@ -315,9 +314,10 @@ summarise(ko_list,
   ) +
   geom_text(
     data = logit_res |>
-      filter(term %in% "host_associated"),
+      filter(term %in% "host_associated") |>
+      mutate(FDR = format(FDR, scientific = T, digits = 2)),
     aes(
-      label = format(FDR, scientific = T, digits = 2),
+      label = if_else(significant, paste0(FDR, "*"), FDR),
       fontface = if_else(significant, "bold", "plain"),
       y = Gene,
       x = 1.1
@@ -410,9 +410,10 @@ summarise(ko_list,
   geom_text(
     data = pois_res |>
       filter(term %in% "host_associated") |>
-      drop_na(significant),
+      drop_na(significant) |>
+      mutate(FDR = format(FDR, scientific = T, digits = 2)),
     aes(
-      label = format(FDR, scientific = T, digits = 2),
+      label = if_else(significant, paste0(FDR, "*"), FDR),
       fontface = if_else(significant, "bold", "plain"),
       y = Gene,
       x = 0.6
@@ -513,6 +514,10 @@ res_fit_linear <-
     )
   )
 
+saveRDS(res_fit_linear, "bootstrap_phymodel2.RDS")
+
+res_fit_linear <- readRDS("bootstrap_phymodel2.RDS")
+
 res_fit_tidy <-
   res_fit_linear |>
   mutate(res_lm = map(
@@ -546,6 +551,7 @@ filter(res_fit_tidy, term %in% "host_associated") |>
 
 p3 <-
   res_fit_tidy |>
+  filter(term != "lGS") |>
   mutate(text_xpos = max(upperbootCI)) |>
   ggplot() +
   annotate("rect",
@@ -567,9 +573,10 @@ p3 <-
     linewidth = 0.5
   ) +
   geom_text(
-    data = ~ filter(.x, term %in% "host_associated"),
+    data = ~ filter(.x, term %in% "host_associated") |>
+      mutate(FDR = format(FDR, scientific = T, digits = 2)),
     aes(
-      label = format(FDR, scientific = T, digits = 2),
+      label = if_else(significant, paste0(FDR, "*"), FDR),
       y = Gene,
       x = text_xpos,
       fontface = if_else(significant, "bold", "plain")
@@ -651,23 +658,3 @@ p4 + p3 +
   )
 
 my_ggsave("fig_tab/fig2", 9, 11)
-
-
-list_rbind(
-  list(
-    "prevalence" = logit_res,
-    "conservation" = mod_tidy
-  ),
-  names_to = "effect"
-) |>
-  filter(term %in% "host_associated", significant) |>
-  count(Gene, effect) |>
-  pivot_wider(values_from = n, names_from = effect) |>
-  View()
-
-
-gtdb <- read_csv("~/gtdb_to_download.csv")
-
-gtdb |>
-  mutate(source = str_detect(isolation_source, "host")) |>
-  janitor::tabyl(source, motility)
