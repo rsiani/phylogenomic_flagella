@@ -2,21 +2,16 @@
 ## Roberto Siani, roberto.siani@helmholtz-munich.de
 # 2024
 
-source("scripts/helper.R")
+source("helper.R")
 
 # metadata ----------------------------------------------------------------
 
 # load manually curate metadata along with CDS count from own prediction
 
 metadata <-
-  read_tsv("data/meta.tsv") |>
-  left_join(read_delim("data/gene_count.fwf",
-    col_names = c("n_genes", "Accession"),
-    delim = " "
-  )) |>
+  read_tsv("meta.tsv") |>
   mutate(
-    log_genome_size = log10(Total.Sequence.Length),
-    log_num_genes = log10(n_genes)
+    log_genome_size = log10(Total.Sequence.Length)
   )
 
 
@@ -25,7 +20,7 @@ metadata |>
 
 count(metadata, set)
 
-write_csv(metadata, "figures/fig_tab/SupplementaryData1.csv")
+write_csv(metadata, "output/SupplementaryData1.csv")
 
 # fig.1a
 
@@ -41,7 +36,7 @@ metadata |>
 # load tree from gtotree
 
 meta_tree <-
-  ape::read.tree("data/proto_out/proto_out.tre")
+  ape::read.tree("proto_out.tre")
 
 # safety checks
 
@@ -64,10 +59,11 @@ ape::is.rooted(rooted_tree)
 
 # summary statistics
 
-janitor::tabyl(metadata, set)
+table(metadata$set)
 
 metadata |>
-  summarise(across(where(is.numeric), ~ mean(.x, na.rm = T)),
+  summarise(
+    across(where(is.numeric), ~ mean(.x, na.rm = T)),
     n = n(),
     .by = c(Class, set)
   )
@@ -77,7 +73,7 @@ metadata |>
 # KO definitions
 
 ko_meta <-
-  read_tsv("data/proto_out/KO_search_results/target-KOs.tsv") |>
+  read_tsv("target-KOs.tsv") |>
   select(domain_name = knum, definition) |>
   mutate(
     Protein = case_match(
@@ -95,46 +91,52 @@ ko_meta <-
         "FlrA/FleQ/FlaK",
       .default = protein_id(definition)
     ),
-    Operon =
-      case_when(
-        str_detect(Protein, "FlhC|FlhD") ~ "flhDC",
-        str_detect(Protein, "FlgA|FlgM|FlgN") ~ "flgANM",
-        str_detect(
-          Protein,
-          "FlgB|FlgC|FlgD|FlgE|FlgF|FlgG|FlgH|FlgI|FlgJ|FlgK|FlgL"
-        ) ~
-          "flgBCDEFGHIJKL",
-        str_detect(Protein, "FlhB|FlhA|FlhE") ~ "flhBAE",
-        str_detect(Protein, "FliA|FliZ|FliY") ~ "fliAZY",
-        str_detect(Protein, "FliD|FliS|FliT") ~ "fliDST",
-        str_detect(Protein, "FliE") ~ "fliE",
-        str_detect(Protein, "FliF|FliG|FliH|FliI|FliJ|FliK") ~ "fliFGHIJK",
-        str_detect(Protein, "FliL|FliM|FliN|FliO|FliP|FliQ|FliR") ~ "fliLMNOPQR",
-        str_detect(Protein, "FlgM|FlgN") ~ "flgMN",
-        str_detect(Protein, "FlgK|FlgL") ~ "flgKL",
-        str_detect(Protein, "FliC") ~ "fliC",
-        str_detect(Protein, "FljB|FljA") ~ "fljBA",
-        str_detect(Protein, "MotA|MotB") ~ "motAB",
-        str_detect(Protein, "MotC|MotD") ~ "motCD",
-        str_detect(Protein, "MotX|MotY") ~ "motXY",
-        str_detect(Protein, "FlgO|FlgP|FlgQ|FlgT") ~ "flgOPQT",
-        .default = protein_to_gene(Protein)
-      ),
+    Operon = case_when(
+      str_detect(Protein, "FlhC|FlhD") ~ "flhDC",
+      str_detect(Protein, "FlgA|FlgM|FlgN") ~ "flgANM",
+      str_detect(
+        Protein,
+        "FlgB|FlgC|FlgD|FlgE|FlgF|FlgG|FlgH|FlgI|FlgJ|FlgK|FlgL"
+      ) ~
+        "flgBCDEFGHIJKL",
+      str_detect(Protein, "FlhB|FlhA|FlhE") ~ "flhBAE",
+      str_detect(Protein, "FliA|FliZ|FliY") ~ "fliAZY",
+      str_detect(Protein, "FliD|FliS|FliT") ~ "fliDST",
+      str_detect(Protein, "FliE") ~ "fliE",
+      str_detect(Protein, "FliF|FliG|FliH|FliI|FliJ|FliK") ~ "fliFGHIJK",
+      str_detect(Protein, "FliL|FliM|FliN|FliO|FliP|FliQ|FliR") ~ "fliLMNOPQR",
+      str_detect(Protein, "FlgM|FlgN") ~ "flgMN",
+      str_detect(Protein, "FlgK|FlgL") ~ "flgKL",
+      str_detect(Protein, "FliC") ~ "fliC",
+      str_detect(Protein, "FljB|FljA") ~ "fljBA",
+      str_detect(Protein, "MotA|MotB") ~ "motAB",
+      str_detect(Protein, "MotC|MotD") ~ "motCD",
+      str_detect(Protein, "MotX|MotY") ~ "motXY",
+      str_detect(Protein, "FlgO|FlgP|FlgQ|FlgT") ~ "flgOPQT",
+      .default = protein_to_gene(Protein)
+    ),
     Role_II = case_when(
+      str_detect(
+        Protein,
+        "FlhA|FlhB|FliP|FliQ|FliR|FliO/FliZ"
+      ) ~ "fT3SS: Export apparatus",
       str_detect(Protein, "RpoD|RpoN") ~ "Regulator: Sigma factor",
       str_detect(Protein, "FlhC|FlhD") ~ "Regulator: Master",
       str_detect(Protein, "FlrA/FleQ/FlaK|FlrC") ~ "Regulator: Alternative",
-      str_detect(Protein, "FliO/FliZ|FliZ|FliY") ~ "Regulator: Accessory",
-      str_detect(Protein, "FliA") ~ "Regulator: Flagellar-specific sigma factor",
+      str_detect(Protein, "FliZ") ~ "Regulator: Accessory",
+      str_detect(
+        Protein,
+        "FliA"
+      ) ~ "Regulator: Flagellar-specific sigma factor",
       str_detect(Protein, "FlgM") ~ "Regulator: Anti-sigma factor",
-      str_detect(Protein, "FliK") ~ "Regulator: Hook-lenght control",
-      str_detect(Protein, "FlhA|FlhB|FliP|FliQ|FliR") ~ "fT3SS: Export apparatus",
+      str_detect(Protein, "FliK") ~ "fT3SS: Hook-lenght control",
       str_detect(Protein, "FliH|FliI|FliJ") ~ "fT3SS: ATPase and accessory",
       str_detect(Protein, "FlgN") ~ "fT3SS: Hook-assembly chaperon",
       str_detect(Protein, "FlhE") ~ "fT3SS: Export regulator",
       str_detect(Protein, "FliF") ~ "Switch: MS ring",
       str_detect(Protein, "FliG|FliM|FliN") ~ "Switch: C ring",
       str_detect(Protein, "FliL") ~ "Switch: Stabilizer",
+      str_detect(Protein, "FliY") ~ "Switch: Chemotaxis",
       str_detect(Protein, "MotC|MotD|MotX|MotY") ~ "Motor: Motor-associated",
       str_detect(Protein, "MotA|MotB") ~ "Motor: Stator",
       str_detect(Protein, "FliC") ~ "Filament: Flagellin",
@@ -142,29 +144,40 @@ ko_meta <-
       str_detect(Protein, "FliS|FliT") ~ "Filament: Chaperon",
       str_detect(Protein, "FliE") ~ "Basal-body/Hook: MS-rod junction",
       str_detect(Protein, "FlgT|FlgO|FlgP|FlgQ") ~ "Basal-body/Hook: Accessory",
-      str_detect(Protein, "FlgK|FlgL") ~ "Basal-body/Hook: Hook-filament junction",
+      str_detect(
+        Protein,
+        "FlgK|FlgL"
+      ) ~ "Basal-body/Hook: Hook-filament junction",
       str_detect(Protein, "FlgJ") ~ "Basal-body/Hook: Peptidoglycan hydrolysis",
       str_detect(Protein, "FlgH|FlgI") ~ "Basal-body/Hook: L/P ring",
       str_detect(Protein, "FlgE") ~ "Basal-body/Hook: Hook",
       str_detect(Protein, "FlgD") ~ "Basal-body/Hook: Hook-capping",
       str_detect(Protein, "FlgA|FlgB|FlgC|FlgF|FlgG") ~ "Basal-body/Hook: Rod"
     ),
-    Tier =
-      case_when(
-        Operon %in% c("flhDC", "flrA/FleQ/FlaK") ~ "I",
-        Operon %in% c("fliE", "flhBAE", "fliFGHIJK", "fliLMNOPQR") ~ "II",
-        Operon %in% c("fliAZY", "fliDST", "flgANM", "flgBCDEFGHIJKL", "flrC") ~ "II/III",
-        Operon %in% c("rpoN", "rpoD") ~ "I+",
-        .default = "III"
-      ) |> factor(levels = c("I", "I+", "II", "II/III", "III")),
-    Role_I =
-      str_remove(Role_II, ":.*") |>
-        factor(levels = c(
-          "Regulator", "fT3SS", "Switch",
-          "Basal-body/Hook", "Motor", "Filament"
-        )),
+    Tier = case_when(
+      Operon %in% c("flhDC", "flrA/FleQ/FlaK") ~ "I",
+      Operon %in% c("fliE", "flhBAE", "fliFGHIJK", "fliLMNOPQR") ~ "II",
+      Operon %in%
+        c("fliAZY", "fliDST", "flgANM", "flgBCDEFGHIJKL", "flrC") ~ "II/III",
+      Operon %in% c("rpoN", "rpoD") ~ "I+",
+      .default = "III"
+    ) |>
+      factor(levels = c("I", "I+", "II", "II/III", "III")),
+    Role_I = str_remove(Role_II, ":.*") |>
+      factor(
+        levels = c(
+          "Regulator",
+          "fT3SS",
+          "Switch",
+          "Basal-body/Hook",
+          "Motor",
+          "Filament"
+        )
+      ),
     Gene = protein_to_gene(Protein),
-    Gene = case_match(Gene, "flrA/FleQ/FlaK" ~ "flrA/fleQ/flaK",
+    Gene = case_match(
+      Gene,
+      "flrA/FleQ/FlaK" ~ "flrA/fleQ/flaK",
       "fliO/FliZ" ~ "fliO/fliZ",
       "fliR/FlhB" ~ "fliR/flhB",
       .default = Gene
@@ -176,10 +189,11 @@ ko_meta <-
 # prevalence and redundancy data
 
 ko_list <-
-  read_tsv("data/proto_out/KO_search_results/KO-hit-counts.tsv") |>
+  read_tsv("KO-hit-counts.tsv") |>
   pivot_longer(
     cols = -c(assembly_id, total_gene_count),
-    names_to = "domain_name", values_to = "n_copies"
+    names_to = "domain_name",
+    values_to = "n_copies"
   ) |>
   mutate(pa = if_else(n_copies > 0, 1, 0)) |>
   left_join(ko_meta) |>
@@ -191,7 +205,9 @@ ko_list <-
 gene_prevalence <- ko_list |>
   filter(any(pa > 0), .by = Accession) |>
   filter(any(pa > 0), .by = Gene) |>
-  mutate(flagellated = if_else(str_detect(Gene, "fliC") & pa == 1, "yes", "no")) |>
+  mutate(
+    flagellated = if_else(str_detect(Gene, "fliC") & pa == 1, "yes", "no")
+  ) |>
   mutate(flagellated = any(flagellated == "yes"), .by = Accession) |>
   filter(flagellated, .by = Accession) |>
   summarise(
@@ -202,7 +218,7 @@ gene_prevalence <- ko_list |>
 
 
 gene_prevalence |>
-  write_csv("figures/fig_tab/SupplementaryData2.csv")
+  write_csv("output/SupplementaryData2.csv")
 
 ggplot(gene_prevalence) +
   geom_histogram(aes(pa)) +
@@ -222,7 +238,6 @@ core <- gene_prevalence |>
 
 # prevalence -------------------------------------------------------------------
 
-
 safe_phyloglm <- safely(phylolm::phyloglm)
 
 # iterate over each ortholog and fit model
@@ -232,7 +247,18 @@ options(future.globals.maxSize = 1 * 1e10)
 res_fit <-
   ko_list |>
   mutate(lGS = log_genome_size - mean(log_genome_size), .by = Gene) |>
-  nest(.by = c(Gene, Protein, domain_name, definition, Tier, Role_I, Role_II, Operon)) |>
+  nest(
+    .by = c(
+      Gene,
+      Protein,
+      domain_name,
+      definition,
+      Tier,
+      Role_I,
+      Role_II,
+      Operon
+    )
+  ) |>
   mutate(
     data2 = map(data, ~ column_to_rownames(.x, "Accession")),
     fit_logit = map(
@@ -265,13 +291,15 @@ res_fit <- read_rds("bootstrap_phymodel.RDS")
 
 logit_res <-
   res_fit |>
-  mutate(res_logit = map(
-    fit_logit,
-    ~ pluck(.x, "result") |>
-      summary() |>
-      pluck("coefficients") |>
-      as_tibble(rownames = "term")
-  )) |>
+  mutate(
+    res_logit = map(
+      fit_logit,
+      ~ pluck(.x, "result") |>
+        summary() |>
+        pluck("coefficients") |>
+        as_tibble(rownames = "term")
+    )
+  ) |>
   select(-c(data, data2, fit_logit, fit_pois)) |>
   unnest(res_logit) |>
   mutate(
@@ -289,16 +317,14 @@ logit_res |> count(term, significant)
 filter(logit_res, term %in% "host_associated") |>
   arrange(Tier, Role_I, Role_II) |>
   select(Gene, lowerbootCI, estimate, upperbootCI, std.error, statistic, FDR) |>
-  mutate(across(c(estimate, std.error, statistic), ~ round(.x, 2)),
+  mutate(
+    across(c(estimate, std.error, statistic), ~ round(.x, 2)),
     FDR = format(FDR, scientific = T, digits = 2)
   ) |>
-  write_csv("figures/fig_tab/SupplementaryData3.csv")
+  write_csv("output/SupplementaryData3.csv")
 
 
-summarise(ko_list,
-  pa = sum(pa) / n(),
-  .by = c(Gene, set, Tier, Role_I)
-) |>
+summarise(ko_list, pa = sum(pa) / n(), .by = c(Gene, set, Tier, Role_I)) |>
   ggplot(aes(x = pa, y = Gene)) +
   geom_path(
     aes(group = Gene),
@@ -330,7 +356,8 @@ summarise(ko_list,
     axis.title.y = element_blank(),
     axis.text.y = element_text(face = "italic"),
     strip.text.y = element_text(
-      angle = 0, hjust = 0,
+      angle = 0,
+      hjust = 0,
       face = "bold"
     ),
     strip.placement = "outside",
@@ -347,32 +374,34 @@ summarise(ko_list,
     axis.line.y = element_blank(),
     axis.ticks.y = element_blank()
   ) +
-  scale_fill_manual(values = pal_set, labels = list(
-    host_associated = "Host Associated",
-    free_living = "Free Living"
-  )) +
-  facet_grid(Role_I ~ .,
-    space = "free_y",
-    scales = "free_y"
+  scale_fill_manual(
+    values = pal_set,
+    labels = list(
+      host_associated = "Host Associated",
+      free_living = "Free Living"
+    )
   ) +
+  facet_grid(Role_I ~ ., space = "free_y", scales = "free_y") +
   scale_x_continuous(
     expand = expansion(mult = 0.1),
-    name = "Prevalence (%)",
+    name = "Prevalence",
     breaks = seq(0, 1, 0.2)
   ) +
   guides(fill = guide_legend(override.aes = list(size = 10)))
 
-my_ggsave("fig_tab/fig1", w = 9, h = 10)
+my_ggsave("output/fig1", w = 9, h = 10)
 
 pois_res <-
   res_fit |>
-  mutate(res_pois = map(
-    fit_pois,
-    ~ pluck(.x, "result") |>
-      summary() |>
-      pluck("coefficients") |>
-      as_tibble(rownames = "term")
-  )) |>
+  mutate(
+    res_pois = map(
+      fit_pois,
+      ~ pluck(.x, "result") |>
+        summary() |>
+        pluck("coefficients") |>
+        as_tibble(rownames = "term")
+    )
+  ) |>
   select(-c(data, data2, fit_logit, fit_pois)) |>
   unnest(res_pois) |>
   mutate(
@@ -391,12 +420,14 @@ pois_res |>
 filter(pois_res, term %in% "host_associated") |>
   arrange(Tier, Role_I, Role_II) |>
   select(Gene, estimate, std.error, statistic, FDR) |>
-  mutate(across(c(estimate, std.error, statistic), ~ round(.x, 2)),
+  mutate(
+    across(c(estimate, std.error, statistic), ~ round(.x, 2)),
     FDR = format(FDR, scientific = T, digits = 2)
   ) |>
   write_csv("figures/fig_tab/SupplementaryData4.csv")
 
-summarise(ko_list,
+summarise(
+  ko_list,
   multiple_copies = sum(n_copies > 1) / n(),
   .by = c(Gene, set)
 ) |>
@@ -440,7 +471,7 @@ summarise(ko_list,
     breaks = seq(0, 6, 0.2)
   )
 
-my_ggsave("fig_tab/suppFig1", 6, 8)
+my_ggsave("output/suppFig1", 6, 8)
 
 filter(pois_res, term == "host_associated", significant) |>
   View()
@@ -449,11 +480,16 @@ filter(pois_res, term == "host_associated", significant) |>
 
 hmmsearch_results <-
   read_csv(
-    "data/proto_out/KO_search_results/hmmsearch_extended/hmmsearch_results.csv",
+    "hmmsearch_results.csv",
     col_names = c(
-      "query_name", "domain_name",
-      "sequence_evalue", "sequence_score", "sequence_bias",
-      "domain_evalue", "domain_score", "domain_bias"
+      "query_name",
+      "domain_name",
+      "sequence_evalue",
+      "sequence_score",
+      "sequence_bias",
+      "domain_evalue",
+      "domain_score",
+      "domain_bias"
     )
   ) |>
   mutate(Accession = str_remove(query_name, "_[0-9]*$"))
@@ -469,7 +505,12 @@ ko_tblout <-
     sequence_score < 2 * domain_score,
   ) |>
   mutate(n_hits = n(), .by = c(Accession, domain_name)) |>
-  slice_min(sequence_evalue, n = 1, by = c(Accession, domain_name), with_ties = F) |>
+  slice_min(
+    sequence_evalue,
+    n = 1,
+    by = c(Accession, domain_name),
+    with_ties = F
+  ) |>
   mutate(
     dbs = (sequence_score - mean(sequence_score)) / sd(sequence_score),
     .by = domain_name
@@ -483,7 +524,8 @@ ko_tblout |>
     dbs = mean(dbs),
     p_of_gene = n() / 53,
     n_hits = mean(n_hits) |>
-      log(), .by = c(Accession, set)
+      log(),
+    .by = c(Accession, set)
   ) |>
   pivot_longer(c(n_hits, dbs)) |>
   ggplot(aes(lGS, value, color = set, size = p_of_gene)) +
@@ -499,7 +541,18 @@ safe_phylolm <- safely(.f = phylolm::phylolm)
 res_fit_linear <-
   ko_tblout |>
   mutate(lGS = log_genome_size - mean(log_genome_size), .by = Gene) |>
-  nest(.by = c(Gene, Protein, domain_name, definition, Tier, Role_I, Role_II, Operon)) |>
+  nest(
+    .by = c(
+      Gene,
+      Protein,
+      domain_name,
+      definition,
+      Tier,
+      Role_I,
+      Role_II,
+      Operon
+    )
+  ) |>
   mutate(
     data2 = map(data, ~ column_to_rownames(.x, "Accession")),
     fit_lm = map(
@@ -514,19 +567,20 @@ res_fit_linear <-
     )
   )
 
-saveRDS(res_fit_linear, "bootstrap_phymodel2.RDS")
 
-res_fit_linear <- readRDS("bootstrap_phymodel2.RDS")
+res_fit_linear <- readRDS("new_bstrap_model.RDS")
 
 res_fit_tidy <-
   res_fit_linear |>
-  mutate(res_lm = map(
-    fit_lm,
-    ~ pluck(.x, "result") |>
-      summary() |>
-      pluck("coefficients") |>
-      as_tibble(rownames = "term")
-  )) |>
+  mutate(
+    res_lm = map(
+      fit_lm,
+      ~ pluck(.x, "result") |>
+        summary() |>
+        pluck("coefficients") |>
+        as_tibble(rownames = "term")
+    )
+  ) |>
   select(-c(data, data2, fit_lm)) |>
   unnest(res_lm) |>
   mutate(
@@ -543,10 +597,11 @@ res_fit_tidy <-
 filter(res_fit_tidy, term %in% "host_associated") |>
   arrange(Tier, Role_I, Role_II) |>
   select(Gene, lowerbootCI, estimate, upperbootCI, std.error, statistic, FDR) |>
-  mutate(across(c(estimate, std.error, statistic), ~ round(.x, 2)),
+  mutate(
+    across(c(estimate, std.error, statistic), ~ round(.x, 2)),
     FDR = format(FDR, scientific = T, digits = 2)
   ) |>
-  write_csv("figures/fig_tab/SupplementaryData5.csv")
+  write_csv("output/SupplementaryData5.csv")
 
 
 p3 <-
@@ -554,9 +609,15 @@ p3 <-
   filter(term != "lGS") |>
   mutate(text_xpos = max(upperbootCI)) |>
   ggplot() +
-  annotate("rect",
-    xmin = 0, xmax = Inf, ymin = -Inf, ymax = Inf,
-    color = NA, fill = "#555555", alpha = .1
+  annotate(
+    "rect",
+    xmin = 0,
+    xmax = Inf,
+    ymin = -Inf,
+    ymax = Inf,
+    color = NA,
+    fill = "#555555",
+    alpha = .1
   ) +
   geom_pointrange(
     aes(
@@ -585,14 +646,12 @@ p3 <-
     color = "#555555",
     hjust = 0.35
   ) +
-  facet_grid(Role_I ~ .,
-    scales = "free",
-    space = "free_y"
-  ) +
+  facet_grid(Role_I ~ ., scales = "free", space = "free_y") +
   theme(
     axis.title.y = element_blank(),
     strip.text.y = element_text(
-      angle = 0, hjust = 0,
+      angle = 0,
+      hjust = 0,
       face = "bold"
     ),
     strip.placement = "outside",
@@ -626,9 +685,15 @@ p3
 p4 <-
   res_fit_tidy |>
   ggplot() +
-  annotate("rect",
-    xmin = 0, xmax = Inf, ymin = -Inf, ymax = Inf,
-    color = NA, fill = "#555555", alpha = .1,
+  annotate(
+    "rect",
+    xmin = 0,
+    xmax = Inf,
+    ymin = -Inf,
+    ymax = Inf,
+    color = NA,
+    fill = "#555555",
+    alpha = .1,
   ) +
   geom_density(
     aes(x = estimate, fill = term),
@@ -651,10 +716,11 @@ p4 <-
 
 p4
 
-p4 + p3 +
+p4 +
+  p3 +
   plot_layout(
     heights = c(1, 9),
     axes = "collect_x"
   )
 
-my_ggsave("fig_tab/fig2", 9, 11)
+my_ggsave("output/fig2", 9, 11)
